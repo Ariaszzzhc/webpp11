@@ -7,6 +7,9 @@
 #include <unordered_map>
 
 namespace webpp {
+
+typedef boost::asio::ip::tcp::socket HTTP;
+
 struct Request {
   std::string method, path, http_version;
   std::shared_ptr<std::istream> content;
@@ -61,7 +64,7 @@ class ServerBase {
   size_t num_threads_;
   std::vector<std::thread> threads;
 
-  virtual void accept();
+  virtual void accept() = 0;
   void process(std::shared_ptr<socket_type> socket) const {
     auto read_buffer = std::make_shared<boost::asio::streambuf>();
 
@@ -83,7 +86,7 @@ class ServerBase {
               boost::asio::async_read(
                   *socket, *read_buffer,
                   boost::asio::transfer_exactly(
-                      stoull(request->header["Content-Length"]) -
+                      std::stoull(request->header["Content-Length"]) -
                       num_additional_bytes),
                   [this, socket, read_buffer, request](
                       const boost::system::error_code& e,
@@ -157,6 +160,24 @@ class ServerBase {
     }
 
     return request;
+  }
+};
+
+class HttpServer : public ServerBase<HTTP> {
+ public:
+  HttpServer(unsigned short port, size_t num_threads = 1)
+      : ServerBase<HTTP>::ServerBase(port, num_threads) {}
+
+ private:
+  void accept() override {
+    auto socket = std::make_shared<HTTP>(io_service_);
+
+    acceptor_.async_accept(*socket,
+                           [this, socket](const boost::system::error_code& e) {
+                             accept();
+
+                             if (!e) process(socket);
+                           });
   }
 };
 };  // namespace webpp
