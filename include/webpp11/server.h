@@ -37,7 +37,7 @@ class ServerBase {
       all_reource_.push_back(it);
     }
 
-    for (auto it = default_resource_.begin(); it != resource_.end(); ++it) {
+    for (auto it = default_resource_.begin(); it != default_resource_.end(); ++it) {
       all_reource_.push_back(it);
     }
 
@@ -134,6 +134,7 @@ class ServerBase {
 
   Request parse_request(std::istream& stream) const {
     Request request;
+    std::unordered_map<std::string, std::string> header;
 
     std::regex e("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
     std::smatch sub_match;
@@ -143,9 +144,9 @@ class ServerBase {
     line.pop_back();
 
     if (std::regex_match(line, sub_match, e)) {
-      request.method = sub_match[0];
-      request.path = sub_match[1];
-      request.http_version = sub_match[2];
+      request.method = sub_match[1];
+      request.path = sub_match[2];
+      request.http_version = sub_match[3];
 
       bool matched;
       e = "^([^:]*): ?(.*)$";
