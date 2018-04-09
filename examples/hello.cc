@@ -1,20 +1,19 @@
-#include <webpp11/server.h>
-#include <iostream>
-#include <sstream>
+#include <webpp11/app.h>
 
 using namespace webpp;
 using namespace std;
 
 int main() {
-    HttpServer server(12345, 4);
-    server.resource_["^//?$"]["GET"] = [](ostream& response, Request& request) {
-        string hello = "Hello, World!";
-        response << "HTTP/1.1 200 OK\r\nContent-Length: " << hello.length()
-                 << "\r\n\r\n"
-                 << hello;
-    };
-    cout << "Server starting at port: 12345" << endl;
-    server.start();
+  HttpApplication app(12345, 4);
 
-    return 0;
+  app.add_route("/", [](ostream& response, Request& request) {
+    string hello = "Hello, World!";
+    response << "HTTP/1.1 200 OK\r\nContent-Length: " << hello.length()
+             << "\r\n\r\n"
+             << hello;
+  });
+
+  app.run();
+
+  return 0;
 }

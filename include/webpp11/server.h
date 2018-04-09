@@ -5,6 +5,7 @@
 #include <regex>
 #include <thread>
 #include <unordered_map>
+#include <iostream>
 
 namespace webpp {
 
@@ -14,40 +15,33 @@ struct Request {
   std::string method, path, http_version;
   std::shared_ptr<std::istream> content;
   std::unordered_map<std::string, std::string> header;
-  std::smatch path_match;
 };
 
 typedef std::map<std::string,
                  std::unordered_map<
                      std::string, std::function<void(std::ostream&, Request&)>>>
-    Resource;
+    Routes;
 
 template <typename socket_type>
 class ServerBase {
  public:
-  Resource resource_;
-  Resource default_resource_;
-
   ServerBase(unsigned short port, size_t num_threads = 1)
-      : endpoint_(boost::asio::ip::tcp::v4(), port),
-        acceptor_(io_service_, endpoint_),
-        num_threads_(num_threads) {}
-  void start() {
-    for (auto it = resource_.begin(); it != resource_.end(); ++it) {
-      all_reource_.push_back(it);
-    }
+      : endpoint(boost::asio::ip::tcp::v4(), port),
+        acceptor(io_service, endpoint),
+        num_threads(num_threads) {}
 
-    for (auto it = default_resource_.begin(); it != default_resource_.end(); ++it) {
-      all_reource_.push_back(it);
+  void start(Routes& routes) {
+    for (auto it = routes.begin(); it != routes.end(); ++it) {
+      all_routes.push_back(it);
     }
 
     accept();
 
-    for (size_t i = 1; i < num_threads_; ++i) {
-      threads.emplace_back([this]() { io_service_.run(); });
+    for (size_t i = 1; i < num_threads; ++i) {
+      threads.emplace_back([this]() { io_service.run(); });
     }
 
-    io_service_.run();
+    io_service.run();
 
     for (auto& t : threads) {
       t.join();
@@ -55,13 +49,13 @@ class ServerBase {
   }
 
  protected:
-  std::vector<Resource::iterator> all_reource_;
+  std::vector<Routes::iterator> all_routes;
 
-  boost::asio::io_service io_service_;
-  boost::asio::ip::tcp::endpoint endpoint_;
-  boost::asio::ip::tcp::acceptor acceptor_;
+  boost::asio::io_service io_service;
+  boost::asio::ip::tcp::endpoint endpoint;
+  boost::asio::ip::tcp::acceptor acceptor;
 
-  size_t num_threads_;
+  size_t num_threads;
   std::vector<std::thread> threads;
 
   virtual void accept() = 0;
@@ -106,14 +100,12 @@ class ServerBase {
 
   void respond(std::shared_ptr<socket_type> socket,
                std::shared_ptr<Request> request) const {
-    for (auto res_it : all_reource_) {
+    for (auto res_it : all_routes) {
       std::regex e(res_it->first);
       std::smatch sm_res;
 
-      if (std::regex_match(request->path, sm_res, e)) {
+      if (res_it->first == request->path) {
         if (res_it->second.count(request->method) > 0) {
-          request->path_match = move(sm_res);
-
           auto write_buffer = std::make_shared<boost::asio::streambuf>();
           std::ostream response(write_buffer.get());
           res_it->second[request->method](response, *request);
@@ -124,7 +116,8 @@ class ServerBase {
                   const boost::system::error_code& ec,
                   size_t bytes_transferred) {
                 // HTTP 持久连接(HTTP 1.1), 递归调用
-                if (!ec && stof(request->http_version) > 1.05) process(socket);
+                if (!ec && std::stof(request->http_version) > 1.05)
+                  process(socket);
               });
           return;
         }
@@ -171,14 +164,14 @@ class HttpServer : public ServerBase<HTTP> {
 
  private:
   void accept() override {
-    auto socket = std::make_shared<HTTP>(io_service_);
+    auto socket = std::make_shared<HTTP>(io_service);
 
-    acceptor_.async_accept(*socket,
-                           [this, socket](const boost::system::error_code& e) {
-                             accept();
+    acceptor.async_accept(*socket,
+                          [this, socket](const boost::system::error_code& e) {
+                            accept();
 
-                             if (!e) process(socket);
-                           });
+                            if (!e) process(socket);
+                          });
   }
 };
 };  // namespace webpp
