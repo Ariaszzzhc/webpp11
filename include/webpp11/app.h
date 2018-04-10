@@ -13,8 +13,8 @@ class HttpApplication {
 
  public:
   void add_route(const std::string url,
-                const std::function<void(std::ostream&, Request&)> func,
-                const std::string method = "GET") {
+                 const std::function<std::shared_ptr<Response>(Request&)> func,
+                 const std::string method = "GET") {
     routes[url][method] = func;
   }
   HttpApplication(const unsigned short port, const size_t num_threads = 1)

@@ -4,22 +4,17 @@
 #include <boost/asio.hpp>
 #include <regex>
 #include <thread>
-#include <unordered_map>
-#include <iostream>
+
+#include "webpp11/request.h"
+#include "webpp11/response.h"
 
 namespace webpp {
 
 typedef boost::asio::ip::tcp::socket HTTP;
 
-struct Request {
-  std::string method, path, http_version;
-  std::shared_ptr<std::istream> content;
-  std::unordered_map<std::string, std::string> header;
-};
-
 typedef std::map<std::string,
                  std::unordered_map<
-                     std::string, std::function<void(std::ostream&, Request&)>>>
+                     std::string, std::function<std::shared_ptr<Response>(Request&)>>>
     Routes;
 
 template <typename socket_type>
@@ -59,6 +54,7 @@ class ServerBase {
   std::vector<std::thread> threads;
 
   virtual void accept() = 0;
+
   void process(std::shared_ptr<socket_type> socket) const {
     auto read_buffer = std::make_shared<boost::asio::streambuf>();
 
@@ -101,14 +97,11 @@ class ServerBase {
   void respond(std::shared_ptr<socket_type> socket,
                std::shared_ptr<Request> request) const {
     for (auto res_it : all_routes) {
-      std::regex e(res_it->first);
-      std::smatch sm_res;
 
       if (res_it->first == request->path) {
         if (res_it->second.count(request->method) > 0) {
-          auto write_buffer = std::make_shared<boost::asio::streambuf>();
-          std::ostream response(write_buffer.get());
-          res_it->second[request->method](response, *request);
+          auto response = res_it->second[request->method](*request);
+          auto write_buffer = response->get();
 
           boost::asio::async_write(
               *socket, *write_buffer,
