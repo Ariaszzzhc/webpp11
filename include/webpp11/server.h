@@ -2,6 +2,7 @@
 #define WEBPP11_SERVER_H
 
 #include <boost/asio.hpp>
+// #include <boost/asio/ssl.hpp>
 #include <regex>
 #include <thread>
 
@@ -11,10 +12,12 @@
 namespace webpp {
 
 typedef boost::asio::ip::tcp::socket HTTP;
+// typedef boost::asio::ssl::stream<HTTP> HTTPS;
 
-typedef std::map<std::string,
-                 std::unordered_map<
-                     std::string, std::function<std::shared_ptr<Response>(Request&)>>>
+typedef std::map<
+    std::string,
+    std::unordered_map<std::string,
+                       std::function<std::shared_ptr<Response>(Request&)>>>
     Routes;
 
 template <typename socket_type>
@@ -97,7 +100,6 @@ class ServerBase {
   void respond(std::shared_ptr<socket_type> socket,
                std::shared_ptr<Request> request) const {
     for (auto res_it : all_routes) {
-
       if (res_it->first == request->path) {
         if (res_it->second.count(request->method) > 0) {
           auto response = res_it->second[request->method](*request);
@@ -166,6 +168,41 @@ class HttpServer : public ServerBase<HTTP> {
                           });
   }
 };
+
+// class SslServer : public ServerBase<HTTPS> {
+//  public:
+//   SslServer(unsigned short port, size_t num_threads = 1,
+//             const std::string&& cert_file, const std::string&& private_key_file)
+//       : ServerBase<HTTPS>::ServerBase(port, num_threads),
+//         context(boost::asio::ssl::context::sslv23) {
+//     context.use_certificate_chain_file(cert_file);
+//     context.use_private_key_file(private_key_file,
+//                                  boost::asio::ssl::context::pem);
+//   }
+
+//  private:
+//   boost::asio::ssl::context context;
+
+//   void accept() override {
+//     auto socket = std::make_shared<HTTPS>(io_service, context);
+
+//     acceptor.async_accept(
+//         socket->lowest_layer(),
+//         [this, socket](const boost::system::error_code& e) {
+//           accept();
+
+//           if (!e) {
+//             socket->asnyc_handshake(
+//                 boost::asio::ssl::stream_base::server,
+//                 [this, socket](const boost::system::error_code& e) {
+//                   if (!e) {
+//                     process(socket);
+//                   }
+//                 });
+//           }
+//         });
+//   }
+// };
 };  // namespace webpp
 
 #endif

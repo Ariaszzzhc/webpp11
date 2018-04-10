@@ -5,10 +5,10 @@
 #include "webpp11/server.h"
 
 namespace webpp {
-class HttpApplication {
- private:
+
+class ApplicationBase {
+ protected:
   Routes routes;
-  HttpServer server;
   unsigned short port;
 
  public:
@@ -17,13 +17,38 @@ class HttpApplication {
                  const std::string method = "GET") {
     routes[url][method] = func;
   }
-  HttpApplication(const unsigned short port, const size_t num_threads = 1)
-      : server(port, num_threads), port(port) {}
 
-  void run() {
+  ApplicationBase(const unsigned short port) : port(port) {}
+
+  virtual void run() = 0;
+};
+
+class HttpApplication : public ApplicationBase {
+ private:
+  HttpServer server;
+
+ public:
+  HttpApplication(const unsigned short port, const size_t num_threads = 1)
+      : ApplicationBase(port), server(port, num_threads) {}
+
+  void run() override {
     std::cout << "Server starting at port: " << port << std::endl;
     server.start(routes);
   }
 };
+
+// class SslApplication : public ApplicationBase {
+//  private:
+//   SslServer server;
+
+//  public:
+//   SslApplication(const unsigned short port, const size_t num_threads = 1)
+//       : ApplicationBase(port), server(port, num_threads) {}
+
+//   void run() override {
+//     std::cout << "Server starting at port: " << port << std::endl;
+//     server.start(routes);
+//   }
+// };
 }  // namespace webpp
 #endif
