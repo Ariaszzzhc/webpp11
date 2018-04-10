@@ -108,7 +108,6 @@ class ServerBase {
               [this, socket, request, write_buffer](
                   const boost::system::error_code& ec,
                   size_t bytes_transferred) {
-                // HTTP 持久连接(HTTP 1.1), 递归调用
                 if (!ec && std::stof(request->http_version) > 1.05)
                   process(socket);
               });

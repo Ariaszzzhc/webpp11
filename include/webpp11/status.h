@@ -1,10 +1,11 @@
 #ifndef WEBPP11_STATUS_H
 #define WEBPP11_STATUS_H
 
-#include <string>
 #include <map>
+#include <string>
 
 namespace webpp {
+namespace http {
 enum HttpStatus {
   Continue = 100,
   SwitchingProtocols = 101,
@@ -48,7 +49,6 @@ enum HttpStatus {
   GatewayTimeout = 504,
   HttpVersionNotSupported = 505
 };
-
 std::map<HttpStatus, std::string> HttpStatusMap{
     {Continue, "Continue"},
     {SwitchingProtocols, "Switching Protocols"},
@@ -91,6 +91,7 @@ std::map<HttpStatus, std::string> HttpStatusMap{
     {ServiceUnavailable, "Service Unavailable"},
     {GatewayTimeout, "Gateway Timeout"},
     {HttpVersionNotSupported, "Http Version Not Supported"}};
+}  // namespace http
 }  // namespace webpp
 
 #endif
