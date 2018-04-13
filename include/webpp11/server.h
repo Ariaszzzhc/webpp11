@@ -6,6 +6,7 @@
 #include <regex>
 #include <thread>
 
+#include "webpp11/logger.h"
 #include "webpp11/request.h"
 #include "webpp11/response.h"
 
@@ -26,7 +27,8 @@ class ServerBase {
   ServerBase(unsigned short port, size_t num_threads = 1)
       : endpoint(boost::asio::ip::tcp::v4(), port),
         acceptor(io_service, endpoint),
-        num_threads(num_threads) {}
+        num_threads(num_threads),
+        logger(new Logger()) {}
 
   void start(Routes& routes) {
     for (auto it = routes.begin(); it != routes.end(); ++it) {
@@ -52,6 +54,8 @@ class ServerBase {
   boost::asio::io_service io_service;
   boost::asio::ip::tcp::endpoint endpoint;
   boost::asio::ip::tcp::acceptor acceptor;
+
+  std::shared_ptr<Logger> logger;
 
   size_t num_threads;
   std::vector<std::thread> threads;
@@ -103,7 +107,10 @@ class ServerBase {
       if (res_it->first == request->path) {
         if (res_it->second.count(request->method) > 0) {
           auto response = res_it->second[request->method](*request);
-          auto write_buffer = response->get();
+          auto write_buffer = response->get_buffer();
+
+          logger->info(request->path + " " + request->method + ": " +
+                       http::HttpStatusMap[response->get_status()]);
 
           boost::asio::async_write(
               *socket, *write_buffer,
@@ -117,6 +124,21 @@ class ServerBase {
         }
       }
     }
+
+    auto not_found_res = std::make_shared<Response>("", http::NotFound);
+    auto write_buffer = not_found_res->get_buffer();
+
+    logger->info(request->path + " " + request->method + ": " +
+                 http::HttpStatusMap[not_found_res->get_status()]);
+
+    boost::asio::async_write(
+        *socket, *write_buffer,
+        [this, socket, request, write_buffer](
+            const boost::system::error_code& e, size_t bytes_transferred) {
+          if (!e && std::stof(request->http_version) > 1.05) {
+            process(socket);
+          }
+        });
   }
 
   Request parse_request(std::istream& stream) const {
@@ -162,7 +184,7 @@ class HttpServer : public ServerBase<HTTP> {
 
     acceptor.async_accept(*socket,
                           [this, socket](const boost::system::error_code& e) {
-                            accept();
+                            //                            accept();
 
                             if (!e) process(socket);
                           });
@@ -172,7 +194,8 @@ class HttpServer : public ServerBase<HTTP> {
 // class SslServer : public ServerBase<HTTPS> {
 //  public:
 //   SslServer(unsigned short port, size_t num_threads = 1,
-//             const std::string&& cert_file, const std::string&& private_key_file)
+//             const std::string&& cert_file, const std::string&&
+//             private_key_file)
 //       : ServerBase<HTTPS>::ServerBase(port, num_threads),
 //         context(boost::asio::ssl::context::sslv23) {
 //     context.use_certificate_chain_file(cert_file);
