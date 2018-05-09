@@ -6,8 +6,9 @@
 
 namespace webpp {
 
-class ApplicationBase {
- protected:
+class Application {
+ private:
+  Server server;
   Routes routes;
   unsigned short port;
 
@@ -18,20 +19,10 @@ class ApplicationBase {
     routes[url][method] = func;
   }
 
-  ApplicationBase(const unsigned short port) : port(port) {}
+  Application(const unsigned short port, const size_t num_threads = 1)
+      : port(port), server(port, num_threads) {}
 
-  virtual void run() = 0;
-};
-
-class HttpApplication : public ApplicationBase {
- private:
-  HttpServer server;
-
- public:
-  HttpApplication(const unsigned short port, const size_t num_threads = 1)
-      : ApplicationBase(port), server(port, num_threads) {}
-
-  void run() override {
+  void run() {
     std::cout << "Server starting at port: " << port << std::endl;
     server.start(routes);
   }

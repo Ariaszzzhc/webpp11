@@ -2,7 +2,6 @@
 #define WEBPP11_SERVER_H
 
 #include <boost/asio.hpp>
-// #include <boost/asio/ssl.hpp>
 #include <regex>
 #include <thread>
 
@@ -13,7 +12,6 @@
 namespace webpp {
 
 typedef boost::asio::ip::tcp::socket HTTP;
-// typedef boost::asio::ssl::stream<HTTP> HTTPS;
 
 typedef std::map<
     std::string,
@@ -21,10 +19,9 @@ typedef std::map<
                        std::function<std::shared_ptr<Response>(Request&)>>>
     Routes;
 
-template <typename socket_type>
-class ServerBase {
+class Server {
  public:
-  ServerBase(unsigned short port, size_t num_threads = 1)
+  Server(unsigned short port, size_t num_threads = 1)
       : endpoint(boost::asio::ip::tcp::v4(), port),
         acceptor(io_service, endpoint),
         num_threads(num_threads),
@@ -48,7 +45,7 @@ class ServerBase {
     }
   }
 
- protected:
+ private:
   std::vector<Routes::iterator> all_routes;
 
   boost::asio::io_service io_service;
@@ -60,9 +57,18 @@ class ServerBase {
   size_t num_threads;
   std::vector<std::thread> threads;
 
-  virtual void accept() = 0;
+  void accept() {
+    auto socket = std::make_shared<HTTP>(io_service);
 
-  void process(std::shared_ptr<socket_type> socket) const {
+    acceptor.async_accept(*socket,
+                          [this, socket](const boost::system::error_code& e) {
+                            //                            accept();
+
+                            if (!e) process(socket);
+                          });
+  }
+
+  void process(std::shared_ptr<HTTP> socket) const {
     auto read_buffer = std::make_shared<boost::asio::streambuf>();
 
     boost::asio::async_read_until(
@@ -101,7 +107,7 @@ class ServerBase {
         });
   }
 
-  void respond(std::shared_ptr<socket_type> socket,
+  void respond(std::shared_ptr<HTTP> socket,
                std::shared_ptr<Request> request) const {
     for (auto res_it : all_routes) {
       if (res_it->first == request->path) {
@@ -172,60 +178,6 @@ class ServerBase {
     return request;
   }
 };
-
-class HttpServer : public ServerBase<HTTP> {
- public:
-  HttpServer(unsigned short port, size_t num_threads = 1)
-      : ServerBase<HTTP>::ServerBase(port, num_threads) {}
-
- private:
-  void accept() override {
-    auto socket = std::make_shared<HTTP>(io_service);
-
-    acceptor.async_accept(*socket,
-                          [this, socket](const boost::system::error_code& e) {
-                            //                            accept();
-
-                            if (!e) process(socket);
-                          });
-  }
-};
-
-// class SslServer : public ServerBase<HTTPS> {
-//  public:
-//   SslServer(unsigned short port, size_t num_threads = 1,
-//             const std::string&& cert_file, const std::string&&
-//             private_key_file)
-//       : ServerBase<HTTPS>::ServerBase(port, num_threads),
-//         context(boost::asio::ssl::context::sslv23) {
-//     context.use_certificate_chain_file(cert_file);
-//     context.use_private_key_file(private_key_file,
-//                                  boost::asio::ssl::context::pem);
-//   }
-
-//  private:
-//   boost::asio::ssl::context context;
-
-//   void accept() override {
-//     auto socket = std::make_shared<HTTPS>(io_service, context);
-
-//     acceptor.async_accept(
-//         socket->lowest_layer(),
-//         [this, socket](const boost::system::error_code& e) {
-//           accept();
-
-//           if (!e) {
-//             socket->asnyc_handshake(
-//                 boost::asio::ssl::stream_base::server,
-//                 [this, socket](const boost::system::error_code& e) {
-//                   if (!e) {
-//                     process(socket);
-//                   }
-//                 });
-//           }
-//         });
-//   }
-// };
 };  // namespace webpp
 
 #endif
